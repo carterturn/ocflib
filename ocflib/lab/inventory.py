@@ -1,16 +1,27 @@
-from functools import partial
+from os import listdir
+from os import mkdir
+from os.path import isdir
 
-from ocflib.infra import db
+from yaml import safe_dump
+from yaml import safe_load
 
-get_connection = partial(db.get_connection, user='anonymous', password=None, db='ocfinventory')
+INVENTORY_FOLDER = '/home/c/ca/carterturn/inventory'
 
 
 def get_devices():
-    with get_connection() as c:
-        return c.execute('SELECT `hostname`, `vendor`, `type`, `name` FROM `lab_inventory`')
+    devices = []
+    for host_inventory_file in listdir(INVENTORY_FOLDER):
+        with open(INVENTORY_FOLDER + '/{}'.format(host_inventory_file)) as f:
+            host_inventory = safe_load(f)
+            if 'devices' in host_inventory.keys():
+                devices.extend(host_inventory['devices'])
+    return devices
 
 
-def get_missing_devices():
-    with get_connection() as c:
-        return c.execute('SELECT `hostname`, `vendor`, `type`, `name` FROM `lab_inventory`'
-                         'WHERE TIMESTAMPDIFF(DAY, `last_seen`, NOW()) > 1')
+def add_host_inventory(host_inventory):
+    if 'hostname' not in host_inventory.keys():
+        return
+    if not isdir(INVENTORY_FOLDER):
+        mkdir(INVENTORY_FOLDER)
+    with open(INVENTORY_FOLDER + '/{}.yaml'.format(host_inventory['hostname']), 'w+') as f:
+        f.write(safe_dump(host_inventory))
